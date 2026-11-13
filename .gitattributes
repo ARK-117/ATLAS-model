@@ -1,0 +1,4 @@
+# Stable source bytes keep frozen implementation hashes portable across systems.
+* text=auto eol=lf
+
+*.zip binary

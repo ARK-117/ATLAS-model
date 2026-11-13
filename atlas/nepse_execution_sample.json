@@ -1,0 +1,12 @@
+[
+  {
+    "effective_from": "2026-10-01",
+    "commission_bps": 8,
+    "minimum_commission_npr": 0.25,
+    "regulatory_bps": 2,
+    "sell_transfer_fee_npr": 5,
+    "spread_bps": 20,
+    "slippage_bps": 5,
+    "max_volume_fraction": 0.02
+  }
+]

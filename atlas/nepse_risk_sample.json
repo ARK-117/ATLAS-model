@@ -1,0 +1,20 @@
+{
+  "session_date": "2026-10-20",
+  "kill_switch_active": false,
+  "equity_npr": 40000,
+  "daily_loss_npr": 0,
+  "drawdown_fraction": 0.02,
+  "limits": {
+    "max_order_npr": 20000,
+    "max_symbol_fraction": 0.20,
+    "max_sector_fraction": 0.35,
+    "max_gross_fraction": 0.95,
+    "max_daily_loss_npr": 500,
+    "max_drawdown_fraction": 0.08,
+    "max_volume_fraction": 0.02
+  },
+  "instruments": {
+    "DEMO_A": {"sector": "Demo sector A", "lot_size": 1, "tradable": true},
+    "DEMO_B": {"sector": "Demo sector B", "lot_size": 1, "tradable": true}
+  }
+}

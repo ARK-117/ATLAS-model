@@ -1,0 +1,32 @@
+{
+  "exclude": [
+    "audit",
+    "venv",
+    ".venv",
+    "node_modules",
+    "**/__pycache__"
+  ],
+  "executionEnvironments": [
+    {
+      "extraPaths": [
+        ".",
+        "tests"
+      ],
+      "root": "tests"
+    },
+    {
+      "extraPaths": [
+        "."
+      ],
+      "root": "."
+    }
+  ],
+  "include": [
+    "atlas",
+    "tests"
+  ],
+  "pythonVersion": "3.11",
+  "reportUnusedImport": "error",
+  "reportUnusedVariable": "error",
+  "typeCheckingMode": "standard"
+}

@@ -1,0 +1,12 @@
+{
+  "description": "Development checks for the standard-library ATLAS Python application.",
+  "devDependencies": {
+    "pyright": "1.1.414"
+  },
+  "name": "atlas-model-development-checks",
+  "private": true,
+  "scripts": {
+    "check": "python -B -S -m atlas.checks",
+    "typecheck": "pyright"
+  }
+}

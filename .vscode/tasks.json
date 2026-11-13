@@ -1,0 +1,67 @@
+{
+  "tasks": [
+    {
+      "args": [
+        "-B",
+        "-S",
+        "-m",
+        "atlas.checks"
+      ],
+      "command": "python",
+      "label": "ATLAS Model: Model quality checks",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "type": "process"
+    },
+    {
+      "args": [
+        "-B",
+        "-S",
+        "-m",
+        "atlas.backtest_cli"
+      ],
+      "command": "python",
+      "label": "ATLAS Model: Backtest",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "type": "process"
+    },
+    {
+      "args": [
+        "-B",
+        "-S",
+        "-m",
+        "atlas.regression_cli"
+      ],
+      "command": "python",
+      "label": "ATLAS Model: Regression",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "type": "process"
+    },
+    {
+      "args": [
+        "-B",
+        "-S",
+        "-m",
+        "atlas.regression_cli",
+        "--trace-date",
+        "2026-05-21"
+      ],
+      "command": "python",
+      "label": "ATLAS Model: Explain regression",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "type": "process"
+    }
+  ],
+  "version": "2.0.0"
+}

@@ -1,0 +1,14 @@
+{
+  "as_of": "2026-10-20T16:00:00+05:45",
+  "currency": "NPR",
+  "available_cash_npr": 15000,
+  "pending_sale_proceeds_npr": 3000,
+  "positions": [
+    {
+      "symbol": "DEMO_A",
+      "settled_quantity": 80,
+      "sellable_quantity": 70,
+      "pending_buy_quantity": 20
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "permission_level": "PAPER_TRADING",
+  "live_trading_enabled": false,
+  "live_production_mode": false,
+  "broker_connection_configured": false,
+  "allow_autonomous_trading": false
+}
