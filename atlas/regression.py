@@ -205,7 +205,7 @@ def _trace_forecast(
 def _diagnostics(
     predictions: Mapping[date, Mapping[str, Decimal]], labels: Sequence[Label], end: date,
 ) -> dict[str, float | int | None]:
-    errors = []
+    errors, zero_errors = [], []
     direction = 0
     for label in labels:
         item = label.observation
@@ -214,12 +214,18 @@ def _diagnostics(
             continue
         estimate = float(predicted)
         errors.append(abs(estimate - label.forward_return))
+        zero_errors.append(abs(label.forward_return))
         direction += (estimate > 0) - (estimate < 0) == (label.forward_return > 0) - (label.forward_return < 0)
     n = len(errors)
+    mae = fsum(error/n for error in errors) if n else None
+    zero_mae = fsum(error/n for error in zero_errors) if n else None
     return {
         "scored_predictions": n,
-        "mae": fsum(errors) / n if n else None,
-        "rmse": sqrt(fsum(error ** 2 for error in errors) / n) if n else None,
+        "mae": mae,
+        "rmse": hypot(*errors)/sqrt(n) if n else None,
+        "zero_return_mae": zero_mae,
+        "zero_return_rmse": hypot(*zero_errors)/sqrt(n) if n else None,
+        "mae_skill_vs_zero": 1-mae/zero_mae if mae is not None and zero_mae else None,
         "p90_absolute_error": sorted(errors)[ceil(n * 0.9) - 1] if n else None,
         "direction_agreement": direction / n if n else None,
     }
@@ -227,8 +233,11 @@ def _diagnostics(
 
 def run_experiment(
     inputs: EvaluationInputs, development: Window, holdout: Window, minimum_fills: int,
-    *, trace: EvaluationTrace | None = None,
+    *, trace: EvaluationTrace | None = None, include_decay: bool = False,
 ) -> dict:
+    from .decayed_regression import effective_dates, fit_decay
+    if type(include_decay) is not bool:
+        raise ValueError("the recency candidate switch must be boolean")
     if development.end >= holdout.start or minimum_fills < 1:
         raise ValueError("regression requires ordered windows and a positive minimum fill count")
     features = prepare_features(inputs, lookback_on=trace.signal_date if trace is not None else None)
@@ -243,13 +252,21 @@ def run_experiment(
         raise ValueError("trace date must be an open development validation or holdout session")
     comparison = Window(validation[0], development.end)
     fold_starts = [len(validation) * index // 3 for index in range(4)]
-    candidates = {}
+    candidates, registry = {}, {}
+    families: list[tuple[str, float, int | None]] = [("linear", 0.0, None), ("ridge", RIDGE_ALPHA, None)]
+    if include_decay:
+        families.extend((("decay20", RIDGE_ALPHA, 20), ("decay60", RIDGE_ALPHA, 60)))
     finalists = {}
+    def fit_model(training, alpha, half_life):
+        return fit(training, alpha) if half_life is None else fit_decay(training, alpha, half_life)
     final_training_traces: dict[str, tuple[list[Label], float]] = {}
     for horizon in HORIZONS:
         observations, labels = _examples(features, dates, horizon)
-        for name, alpha in (("linear", 0.0), ("ridge", RIDGE_ALPHA)):
+        for name, alpha, half_life in families:
             key = f"{name}_{horizon}"
+            registry[key] = {"family": "date_decay_ridge" if half_life is not None else name,
+                             "horizon_sessions": horizon, "ridge_alpha": alpha,
+                             "half_life_training_dates": half_life}
             predictions = {}
             training_dates = []
             candidate_trace = (
@@ -260,13 +277,13 @@ def run_experiment(
                 for begin, end in zip(fold_starts, fold_starts[1:]):
                     fold = validation[begin:end]
                     training = matured(labels, development.start, fold[0])
-                    model = fit(training, alpha)
+                    model = fit_model(training, alpha, half_life)
                     training_dates.append(max(label.known_on for label in training))
                     predictions.update(_forecast(model, observations, fold))
                     if candidate_trace is not None and candidate_trace.signal_date in fold:
                         _trace_forecast(candidate_trace, model, observations, predictions, training, fold[0], alpha)
                 final_training = matured(labels, development.start, development.end)
-                final = fit(final_training, alpha)
+                final = fit_model(final_training, alpha, half_life)
             except ValueError as error:
                 candidates[key] = {"status": "unavailable", "reason": str(error)}
                 continue
@@ -318,7 +335,27 @@ def run_experiment(
         checks[name] = {"baseline": baseline, "candidate": candidate, "criteria_met": clears}
         passed = passed and clears
 
+    selected_development = candidates[selected]["development"]
+    final_labels = matured(labels, development.start, development.end)
+    selected_half_life = registry[selected]["half_life_training_dates"]
+    weight_effective_dates = (effective_dates(final_labels, selected_half_life) if selected_half_life is not None
+                              else float(len({label.observation.session_date for label in final_labels})))
+    selection_evidence = {
+        "evaluated_candidates": len(finalists),
+        "selected_development_fills": selected_development.trade_count,
+        "has_development_fills": selected_development.trade_count > 0,
+        "all_candidates_inactive": all(row["development"].trade_count == 0 for row in candidates.values()
+                                       if row["status"] == "evaluated"),
+        "development_tie_count": sum(value[:2] == finalists[selected][:2] for value in finalists.values()),
+        "readiness": "insufficient_development_activity" if selected_development.trade_count == 0 else "research_only",
+    }
     return {
+        "candidate_registry": registry, "recency_candidates_enabled": include_decay,
+        "weight_effective_training_dates": weight_effective_dates,
+        "selection_evidence": selection_evidence,
+        "validation_folds": [{"start": validation[begin], "end": validation[end-1],
+                              "last_training_label": candidates[selected]["fold_last_label_dates"][index]}
+                             for index, (begin, end) in enumerate(zip(fold_starts, fold_starts[1:]))],
         "features": FEATURES,
         "horizons_sessions": HORIZONS,
         "ridge_alpha": RIDGE_ALPHA,
@@ -332,5 +369,5 @@ def run_experiment(
         "frozen_model": model,
         "holdout_diagnostics": _diagnostics(predictions, labels, holdout.end),
         "holdout_scenarios": checks,
-        "research_criteria_met": passed,
+        "research_criteria_met": passed and selection_evidence["has_development_fills"],
     }

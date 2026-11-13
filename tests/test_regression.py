@@ -9,7 +9,7 @@ from decimal import Context, Decimal, ROUND_FLOOR, localcontext
 from unittest.mock import patch
 
 from atlas.backtest import evaluate_window, prepare_features
-from atlas.regression import Label, Observation, Regression, fit, matured, run_experiment
+from atlas.regression import Label, Observation, Regression, _diagnostics, fit, matured, run_experiment
 from atlas.regression_cli import demo_experiment_inputs, main
 
 
@@ -127,3 +127,53 @@ class RegressionTests(unittest.TestCase):
                     self.assertEqual(active.prec, context.prec)
                     self.assertEqual(active.rounding, context.rounding)
                 self.assertEqual(actual, baseline)
+
+    def test_no_change_baseline_uses_the_same_matured_targets_and_undefined_skill_is_explicit(self):
+        start = date(2026,1,1)
+        labels = [Label(Observation(start+timedelta(days=i),"A",(1.0,)),
+                        start+timedelta(days=i+1),target) for i,target in enumerate((0.0,0.2,0.1))]
+        predictions = {label.observation.session_date:{"A":Decimal("0.1")} for label in labels}
+        boundary = start+timedelta(days=3)
+        diagnostics = _diagnostics(predictions,labels,boundary)
+        self.assertEqual(diagnostics["scored_predictions"],3)
+        for key, expected in (("mae",0.2/3),("zero_return_mae",0.1),("mae_skill_vs_zero",1/3)):
+            actual = diagnostics[key]
+            assert actual is not None
+            self.assertAlmostEqual(float(actual),expected)
+        future = Label(Observation(start,"A",(1.0,)),boundary+timedelta(days=1),1e200)
+        self.assertEqual(diagnostics,_diagnostics(predictions,labels+[future],boundary))
+        zeros = [Label(Observation(start,"A",(1.0,)),start,0.0)]
+        self.assertIsNone(_diagnostics({start:{"A":Decimal(0)}},zeros,boundary)["mae_skill_vs_zero"])
+        self.assertIsNone(_diagnostics({},zeros,boundary)["zero_return_mae"])
+
+    def test_forecast_rmse_handles_finite_large_errors_without_squaring_overflow(self):
+        start = date(2026,1,1)
+        labels = [Label(Observation(start,"A",(1.0,)),start,1e200)]
+        diagnostics = _diagnostics({start:{"A":Decimal(0)}},labels,start)
+        self.assertEqual(diagnostics["rmse"],1e200)
+        self.assertEqual(diagnostics["zero_return_rmse"],1e200)
+        self.assertEqual(diagnostics["mae_skill_vs_zero"],0)
+
+    def test_zero_activity_and_fixed_order_ties_are_reported_without_a_profit_claim(self):
+        report = run_experiment(*demo_experiment_inputs())
+        evidence = report["selection_evidence"]
+        self.assertEqual(evidence["selected_development_fills"],0)
+        self.assertTrue(evidence["all_candidates_inactive"])
+        self.assertEqual(evidence["development_tie_count"],4)
+        self.assertEqual(evidence["readiness"],"insufficient_development_activity")
+        for fold in report["validation_folds"]:
+            self.assertLess(fold["last_training_label"],fold["start"])
+
+    def test_a_lucky_holdout_cannot_qualify_a_model_with_no_validation_fills(self):
+        inputs,development,holdout,minimum = demo_experiment_inputs()
+        def lucky(case,window,features,**kwargs):
+            result = evaluate_window(case,window,features,**kwargs)
+            if window == holdout and kwargs.get("forecasts") is not None:
+                return replace(result,net_return=Decimal("0.20"),max_drawdown=Decimal(0),
+                               trade_count=minimum,order_count=max(minimum,result.order_count))
+            return result
+        with patch("atlas.regression.evaluate_window",side_effect=lucky):
+            report = run_experiment(inputs,development,holdout,minimum)
+        self.assertTrue(all(case["criteria_met"] for case in report["holdout_scenarios"].values()))
+        self.assertFalse(report["selection_evidence"]["has_development_fills"])
+        self.assertFalse(report["research_criteria_met"])

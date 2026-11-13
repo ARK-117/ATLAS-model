@@ -17,6 +17,7 @@ python -B -S -m atlas.checks
 python -B -S -m atlas.backtest_cli
 python -B -S -m atlas.regression_cli
 python -B -S -m atlas.regression_cli --trace-date 2026-05-21
+python -B -S -m atlas.regression_cli --recency
 ~~~
 
 The runtime requires only Python's standard library. Node.js installs the pinned development type checker.

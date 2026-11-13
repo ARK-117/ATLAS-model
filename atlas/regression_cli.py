@@ -25,12 +25,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Compare linear and ridge forecasts against the paper baseline.")
     parser.add_argument("--spec", type=Path, help="local backtest specification (default: synthetic demo)")
     parser.add_argument("--trace-date", type=date.fromisoformat, help="explain calculations on one signal date (YYYY-MM-DD)")
+    parser.add_argument("--recency", action="store_true", help="include prespecified 20/60-training-date weighted ridge challengers")
     args = parser.parse_args()
     trace = EvaluationTrace(args.trace_date) if args.trace_date is not None else None
     try:
         require_paper_lock()
         inputs = demo_experiment_inputs() if args.spec is None else load_backtest_spec(args.spec)
-        report = run_experiment(*inputs, trace=trace)
+        report = run_experiment(*inputs, trace=trace, include_decay=args.recency)
         if args.spec is None:
             report["research_criteria_met"] = None
             for scenario in report["holdout_scenarios"].values():

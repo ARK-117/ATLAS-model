@@ -12,6 +12,15 @@ With standardized feature matrix Z and demeaned return y, the coefficients solve
 Constant columns receive a zero coefficient and a scale of one. The intercept is the mean training return.
 Prediction is intercept + sum(beta_j * (x_j - mean_j) / scale_j).
 
+The optional --recency experiment adds four prespecified date-balanced ridge challengers.
+For training date d, unnormalized weight is 2^(-age/H), where age counts observed training dates
+and H is 20 or 60 dates. Each date's normalized weight is divided among its stock observations.
+Weighted training means, population scales and target mean use those row weights; the equation is
+(Z^T W Z + 0.10 I) beta = Z^T W (y - weighted_mean_y).
+Weight-effective dates are (sum date weights)^2 / sum(squared date weights); at least 12 are required.
+This measures weight concentration, not independent statistical trials. The default four candidates
+remain unchanged. Opting in evaluates eight; synthetic results never promote a live model.
+
 The experiment compares 5- and 20-session raw close-to-close targets. A label is admitted only after its
 target date and strictly before the validation boundary. Three expanding validation folds occupy the
 later half of development. Development results select the candidate; holdout scoring uses its frozen fit.
@@ -34,7 +43,8 @@ Live data fetching, dashboard state, private portfolios and account access are a
 ## Independent tests
 
 1. Run the complete quality command before making changes and retain the commit SHA with the result.
-2. Inspect the known-line OLS/ridge tests and numerical edge cases in test_regression.py.
+2. Inspect known-line fits, numerical edge cases, same-target no-change diagnostics and the
+   recency/date-balancing tests in test_regression.py and test_decayed_regression.py.
 3. Check that changing future/holdout bars cannot change prior decisions or model selection.
 4. Use a separate, permitted dataset and choose development/holdout windows before tuning.
 5. Run all cost/liquidity scenarios and compare against cash and the passive benchmark.
