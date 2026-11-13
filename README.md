@@ -31,5 +31,5 @@ and operating evidence. Live orders remain locked.
 ## Version provenance
 
 EXPORT_MANIFEST.json lists the originating private commit and SHA-256 of every exported file.
-Copied model and test files retain their source bytes. Public changes should be reviewed in pull requests;
+Copied model and test files retain their committed Git bytes, so hashes survive cross-platform checkout. Public changes should be reviewed in pull requests;
 they do not automatically modify the private application. Each later export is an explicit reviewed update.
